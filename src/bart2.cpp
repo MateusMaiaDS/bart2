@@ -392,7 +392,11 @@ Node* sample_node(std::vector<Node*> leaves_){
         // Getting the number of leaves
         int n_leaves = leaves_.size();
         // return(leaves_[std::rand()%n_leaves]);
-        return(leaves_[arma::randu(arma::distr_param(0,(n_leaves-1)))]);
+        if(n_leaves == 0 ){
+             return leaves_[0];
+        } else {
+             return(leaves_[arma::randu(arma::distr_param(0,(n_leaves-1)))]);
+        }
 
 }
 
