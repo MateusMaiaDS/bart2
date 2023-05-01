@@ -210,49 +210,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// inn_prod_one
-double inn_prod_one(arma::mat beta_vec);
-RcppExport SEXP _bart2_inn_prod_one(SEXP beta_vecSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type beta_vec(beta_vecSEXP);
-    rcpp_result_gen = Rcpp::wrap(inn_prod_one(beta_vec));
-    return rcpp_result_gen;
-END_RCPP
-}
-// inn_prod_two
-double inn_prod_two(arma::mat beta_vec);
-RcppExport SEXP _bart2_inn_prod_two(SEXP beta_vecSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type beta_vec(beta_vecSEXP);
-    rcpp_result_gen = Rcpp::wrap(inn_prod_two(beta_vec));
-    return rcpp_result_gen;
-END_RCPP
-}
-// inn_prod_three
-double inn_prod_three(arma::mat beta_vec);
-RcppExport SEXP _bart2_inn_prod_three(SEXP beta_vecSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type beta_vec(beta_vecSEXP);
-    rcpp_result_gen = Rcpp::wrap(inn_prod_three(beta_vec));
-    return rcpp_result_gen;
-END_RCPP
-}
-// array_check
-void array_check(arma::cube arr_);
-RcppExport SEXP _bart2_array_check(SEXP arr_SEXP) {
-BEGIN_RCPP
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::cube >::type arr_(arr_SEXP);
-    array_check(arr_);
-    return R_NilValue;
-END_RCPP
-}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_bart2_gamma_pdf", (DL_FUNC) &_bart2_gamma_pdf, 3},
@@ -271,10 +228,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_bart2_rMVNslow", (DL_FUNC) &_bart2_rMVNslow, 2},
     {"_bart2_matrix_mat", (DL_FUNC) &_bart2_matrix_mat, 1},
     {"_bart2_rand_unif", (DL_FUNC) &_bart2_rand_unif, 0},
-    {"_bart2_inn_prod_one", (DL_FUNC) &_bart2_inn_prod_one, 1},
-    {"_bart2_inn_prod_two", (DL_FUNC) &_bart2_inn_prod_two, 1},
-    {"_bart2_inn_prod_three", (DL_FUNC) &_bart2_inn_prod_three, 1},
-    {"_bart2_array_check", (DL_FUNC) &_bart2_array_check, 1},
     {NULL, NULL, 0}
 };
 

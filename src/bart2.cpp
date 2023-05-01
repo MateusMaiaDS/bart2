@@ -258,7 +258,7 @@ bool Node::isRight(){
 void Node::sampleSplitVar(modelParam &data){
 
           // Sampling one index from 0:(p-1)
-          var_split = std::rand()%data.x_train.n_cols;
+          var_split = arma::randu(arma::distr_param(0,(data.x_train.n_cols-1)));
 
 }
 // This functions will get and update the current limits for this current variable
@@ -391,7 +391,9 @@ Node* sample_node(std::vector<Node*> leaves_){
 
         // Getting the number of leaves
         int n_leaves = leaves_.size();
-        return(leaves_[std::rand()%n_leaves]);
+        // return(leaves_[std::rand()%n_leaves]);
+        return(leaves_[arma::randu(arma::distr_param(0,(n_leaves-1)))]);
+
 }
 
 // Grow a tree for a given rule

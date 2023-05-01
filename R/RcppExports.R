@@ -65,19 +65,3 @@ rand_unif <- function() {
     .Call('_bart2_rand_unif', PACKAGE = 'bart2')
 }
 
-inn_prod_one <- function(beta_vec) {
-    .Call('_bart2_inn_prod_one', PACKAGE = 'bart2', beta_vec)
-}
-
-inn_prod_two <- function(beta_vec) {
-    .Call('_bart2_inn_prod_two', PACKAGE = 'bart2', beta_vec)
-}
-
-inn_prod_three <- function(beta_vec) {
-    .Call('_bart2_inn_prod_three', PACKAGE = 'bart2', beta_vec)
-}
-
-array_check <- function(arr_) {
-    invisible(.Call('_bart2_array_check', PACKAGE = 'bart2', arr_))
-}
-

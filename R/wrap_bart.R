@@ -1,3 +1,7 @@
+## Bart
+#' @useDynLib bart2
+#' @importFrom Rcpp sourceCpp
+#'
 # A fucction to retrive the number which are the factor columns
 base_dummyVars <- function(df) {
         num_cols <- sapply(df, is.numeric)
