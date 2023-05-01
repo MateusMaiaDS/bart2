@@ -7,7 +7,6 @@ base_dummyVars <- function(df) {
 }
 
 # Getting the BART wrapped function
-#' @importFrom caret predict.dummyVars
 #' @export
 bart2 <- function(x_train,
                   y,

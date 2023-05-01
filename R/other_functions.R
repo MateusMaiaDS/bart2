@@ -62,21 +62,6 @@ naive_sigma <- function(x,y){
 
 
 
-# http://statweb.lsu.edu/faculty/marx/
-tpower <- function(x, t, p) {
-        # Truncated p-th power function
-        return((x - t)^p * (x > t))
-}
-bbase <- function(x, xl = min(x), xr = max(x), nseg = 30, deg = 3) {
-        # Construct B-spline basis
-        dx <- (xr - xl) / nseg
-        knots <- seq(xl - deg * dx, xr + deg * dx, by = dx)
-        P <- outer(x, knots, tpower, deg)
-        n <- dim(P)[2]
-        D <- diff(diag(n), diff = deg + 1) / (gamma(deg + 1) * dx^deg)
-        B <- (-1)^(deg + 1) * P %*% t(D)
-        return(B)
-}
 
 
 # Function to create a vector of variables that being categorical will
@@ -159,41 +144,6 @@ pi_coverage <- function(y, y_hat_post, sd_post,only_post = FALSE, prob = 0.5,n_m
      pi_cov <- sum((y<=up_ci) & (y>=low_ci))/length(y)
 
      return(pi_cov)
-}
-
-# # (OLD PRIOR) Get a prior distribution for \tau_b
-# d_tau_b_rate <- function(df,
-#                     prob,
-#                     kappa,
-#                     n_tree,
-#                     d_tau){
-#      (pgamma(q = 0.1*(4*(kappa^2)*n_tree),shape = df/2,rate = d_tau,lower.tail = FALSE)-prob)^2
-# }
-
-# Get a prior distribution for \tau_b
-d_tau_b_rate <- function(df_tau_b,
-                         prob_tau_b,
-                         naive_tau_b,
-                         d_tau_b){
-        (pgamma(q = naive_tau_b,shape = df_tau_b/2,rate = d_tau_b,lower.tail = FALSE)-prob_tau_b)^2
-}
-
-
-# Getting the naive value for \tau_b
-nll <- function(dat, x, par,B,P, n_tree,tau_b_0_) {
-        tau <- par[1]
-        tau_b <- par[2]
-        y <- dat
-        n <- length(y)
-        P_inv <- solve(P+diag(.Machine$double.eps,nrow = nrow(P))*1e8)
-        B_new <- matrix(0, nrow = dim(B)[1], ncol = dim(B)[1])
-        for(i in 1:dim(B)[3]){
-                B_new <- B_new + B[,,i]%*%tcrossprod((P_inv),B[,,i])
-        }
-        # tryCatch(-mvnfast::dmvn(t(y), rep(0, n), diag(tau^-1, n) + tcrossprod(B_new), log = TRUE),
-        #          error=function(e) -Inf)
-        return(-mvtnorm::dmvnorm(x = t(y), mean = rep(0, n),
-                              sigma = diag(tau^-1, n) + (n_tree^-1)*(tau_b_0_^-1)+ (n_tree^-1)*(tau_b^-1)*B_new, log = TRUE))
 }
 
 
