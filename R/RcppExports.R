@@ -17,8 +17,8 @@ log_dmvn <- function(x, Sigma) {
     .Call('_bart2_log_dmvn', PACKAGE = 'bart2', x, Sigma)
 }
 
-cppbart <- function(x_train, y_train, x_test, n_tree, node_min_size, n_mcmc, n_burn, tau, mu, tau_mu, alpha, beta, a_tau, d_tau, stump) {
-    .Call('_bart2_cppbart', PACKAGE = 'bart2', x_train, y_train, x_test, n_tree, node_min_size, n_mcmc, n_burn, tau, mu, tau_mu, alpha, beta, a_tau, d_tau, stump)
+cppbart <- function(x_train, y_train, x_test, n_tree, node_min_size, n_mcmc, n_burn, tau, mu, tau_mu, alpha, beta, a_tau, d_tau, stump, no_rotation_bool) {
+    .Call('_bart2_cppbart', PACKAGE = 'bart2', x_train, y_train, x_test, n_tree, node_min_size, n_mcmc, n_burn, tau, mu, tau_mu, alpha, beta, a_tau, d_tau, stump, no_rotation_bool)
 }
 
 mat_init <- function(n) {
