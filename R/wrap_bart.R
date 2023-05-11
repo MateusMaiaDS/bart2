@@ -131,7 +131,8 @@ bart2 <- function(x_train,
           alpha,
           beta,
           a_tau,d_tau,
-          stump)
+          stump,
+          no_rotation_bool)
 
 
      if(scale_bool){
