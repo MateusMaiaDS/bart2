@@ -141,6 +141,7 @@ bart2 <- function(x_train,
                      all_tree_post[[i]] <-  unnormalize_bart(z = bart_obj[[4]][,,i],a = min_y,b = max_y)
              }
              tau_post <- bart_obj[[3]]/((max_y-min_y)^2)
+             all_tau_post <- bart_obj[[7]]/((max_y-min_y)^2)
      } else {
              y_train_post <- bart_obj[[1]]
              y_test_post <- bart_obj[[2]]
@@ -148,6 +149,8 @@ bart2 <- function(x_train,
              for(i in 1:round(n_mcmc-n_burn)){
                      all_tree_post[[i]] <-  bart_obj[[4]][,,i]
              }
+             all_tau_post <- bart_obj[[7]]
+
 
      }
 
@@ -155,6 +158,7 @@ bart2 <- function(x_train,
      return(list(y_hat = y_train_post,
                  y_hat_test = y_test_post,
                  tau_post = tau_post,
+                 all_tau_post = bart_obj[[7]],
                  all_tree_post = all_tree_post,
                  prior = list(n_tree = n_tree,
                               alpha = alpha,
@@ -167,8 +171,7 @@ bart2 <- function(x_train,
                  data = list(x_train = x_train,
                              y = y,
                              x_test = x_test,
-                             grow_accept = bart_obj[[5]],
-                             prune_accept = bart_obj[[6]],
-                             change_accept = bart_obj[[7]])))
+                             move_proposal = bart_obj[[5]],
+                             move_acceptance = bart_obj[[6]])))
 }
 

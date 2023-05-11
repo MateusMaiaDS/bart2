@@ -9,6 +9,24 @@ using namespace std;
 // Statistics Function
 // =====================================
 
+arma::mat rotate_operator(){
+
+        arma::vec theta_vec_ = arma::linspace(0.0,M_PI,20);
+        double theta_ = theta_vec_(arma::randi(arma::distr_param(0,(theta_vec_.size()-1))));
+
+        // double theta_ = arma::randu(arma::distr_param(0.0,M_PI)); // Uniform grid
+        double sin_ = std::sin(theta_);
+        double cos_ = std::cos(theta_);
+
+        arma::mat rot_mat_ = arma::mat(2,2);
+        rot_mat_(0,0) = cos_;
+        rot_mat_(0,1) = -sin_;
+        rot_mat_(0,1) = sin_;
+        rot_mat_(1,1) = cos_;
+
+        return  rot_mat_;
+}
+
 void printMatrix(const arma::mat& M) {
         int rows = M.n_rows;
         int cols = M.n_cols;
@@ -143,9 +161,8 @@ modelParam::modelParam(arma::mat x_train_,
         n_burn = n_burn_;
 
         // Grow acceptation ratio
-        grow_accept = 0;
-        prune_accept = 0;
-        change_accept = 0;
+        move_proposal = arma::vec(5,arma::fill::zeros);
+        move_acceptance = arma::vec(5,arma::fill::zeros);
 
         stump = stump_; // Checking if only restrict the model to stumps
 
@@ -534,7 +551,181 @@ void grow(Node* tree, modelParam &data, arma::vec &curr_res, int t){
         if(rand_unif () < acceptance){
                 // Do nothing just keep the new tree
                 // cout << " ACCEPTED" << endl;
-                data.grow_accept++;
+                data.move_acceptance(0)++;
+        } else {
+                // Returning to the old values
+                g_node->var_split = old_var_split;
+                g_node->var_split_rule = old_var_split_rule;
+                g_node->lower = old_lower;
+                g_node->upper = old_upper;
+                g_node->deletingLeaves();
+        }
+
+        return;
+
+}
+
+// Grow a tree for a given rule
+void grow_rotation(Node* tree, modelParam &data, arma::vec &curr_res){
+
+        // Getting the number of terminal nodes
+        std::vector<Node*> t_nodes = leaves(tree) ;
+        std::vector<Node*> nog_nodes = nogs(tree);
+
+        // Selecting one node to be sampled
+        Node* g_node = sample_node(t_nodes);
+
+        // Store all old quantities that will be used or not
+        double old_lower = g_node->lower;
+        double old_upper = g_node->upper;
+        int old_var_split = g_node->var_split;
+        double old_var_split_rule = g_node->var_split_rule;
+
+        // Calculate current tree log likelihood
+        double tree_log_like = 0;
+
+
+        // Calculating the whole likelihood for the tree ( Do I really need to do this here? I do not think so)
+        // (Yes, I do if I'm going to work with the loglikelihood over the trees to compute \phi_{i,j})
+        // ----------------------------------------------
+        // -- Gonna generalize the code to avoid this ---
+        // ----------------------------------------------
+
+        // // Calculating the whole likelihood fo the tree
+        for(int i = 0; i < t_nodes.size(); i++){
+                // cout << "Error gpNodeLogLike" << endl;
+                t_nodes[i]->nodeLogLike(data, curr_res); // Do I need to do this?
+                tree_log_like = tree_log_like + t_nodes[i]->log_likelihood;
+        }
+        // Updating the grown_node only (NEED TO UPDATE ALL AGAIN IN THE)
+        // g_node->gpNodeLogLike(data,curr_res,t);
+        // tree_log_like = tree_log_like + g_node->log_likelihood;
+
+        // cout << "LogLike Node ok Grow" << endl;
+
+        // Adding the leaves
+        g_node->addingLeaves(data);
+        // Updating the limits
+        g_node->getLimits();
+
+        // Creating the rotation dummy aux
+        arma::mat rotated_coord(data.x_train.n_rows,2);
+        arma::mat rotated_coord_test(data.x_test.n_rows,2);
+
+        // Sample var
+        arma::vec candidates = arma::regspace(0,(data.x_train.n_cols-1));
+        arma::vec sample = arma::shuffle(candidates);
+        sample = sample.subvec(0,1);
+
+        // Rotating coordinations
+        rotated_coord.col(0) = data.x_train.col(sample(0));
+        rotated_coord.col(1) = data.x_train.col(sample(1));
+
+        rotated_coord_test.col(0) = data.x_test.col(sample(0));
+        rotated_coord_test.col(1) = data.x_test.col(sample(1));
+
+        arma::mat rotate_operator_ = rotate_operator();
+        rotated_coord  = rotated_coord*rotate_operator_;
+        rotated_coord_test = rotated_coord_test*rotate_operator_;
+
+        // Selecting the var
+        int selected_rot_var =  arma::randi(arma::distr_param(0,1));
+        double rotated_var_split_rule = arma::randu(arma::distr_param(min(rotated_coord.col(selected_rot_var)),max(rotated_coord.col(selected_rot_var))));
+
+
+        // Create an aux for the left and right index
+        int train_left_counter = 0;
+        int train_right_counter = 0;
+
+        int test_left_counter = 0;
+        int test_right_counter = 0;
+
+        // Updating the left and the right nodes
+        for(int i = 0;i<data.x_train.n_rows;i++){
+                if(g_node -> train_index[i] == -1 ){
+                        g_node->left->n_leaf = train_left_counter;
+                        g_node->right->n_leaf = train_right_counter;
+                        break;
+                }
+                if(rotated_coord(g_node->train_index[i],selected_rot_var)<rotated_var_split_rule){
+                        g_node->left->train_index[train_left_counter] = g_node->train_index[i];
+                        train_left_counter++;
+                } else {
+                        g_node->right->train_index[train_right_counter] = g_node->train_index[i];
+                        train_right_counter++;
+                }
+
+        }
+
+
+        // Updating the left and right nodes for the
+        for(int i = 0;i<data.x_test.n_rows; i++){
+                if(g_node -> test_index[i] == -1){
+                        g_node->left->n_leaf_test = test_left_counter;
+                        g_node->right->n_leaf_test = test_right_counter;
+                        break;
+                }
+                if(rotated_coord_test(g_node->test_index[i],selected_rot_var)< rotated_var_split_rule){
+                        g_node->left->test_index[test_left_counter] = g_node->test_index[i];
+                        test_left_counter++;
+                } else {
+                        g_node->right->test_index[test_right_counter] = g_node->test_index[i];
+                        test_right_counter++;
+                }
+        }
+
+        // If is a root node
+        if(g_node->isRoot){
+                g_node->left->n_leaf = train_left_counter;
+                g_node->right->n_leaf = train_right_counter;
+                g_node->left->n_leaf_test = test_left_counter;
+                g_node->right->n_leaf_test = test_right_counter;
+        }
+
+        // Avoiding nodes lower than the node_min
+        if((g_node->left->n_leaf<data.node_min_size) || (g_node->right->n_leaf<data.node_min_size) ){
+
+                // cout << " NODES" << endl;
+                // Returning to the old values
+                g_node->var_split = old_var_split;
+                g_node->var_split_rule = old_var_split_rule;
+                g_node->lower = old_lower;
+                g_node->upper = old_upper;
+                g_node->deletingLeaves();
+                return;
+        }
+
+
+        // Updating the loglikelihood for those terminal nodes
+        // cout << "Calculating likelihood of the new node on left" << endl;
+        g_node->left->nodeLogLike(data, curr_res);
+        // cout << "Calculating likelihood of the new node on right" << endl;
+        g_node->right->nodeLogLike(data, curr_res);
+        // cout << "NodeLogLike ok again" << endl;
+
+
+        // Calculating the prior term for the grow
+        double tree_prior = log(data.alpha*pow((1+g_node->depth),-data.beta)) +
+                log(1-data.alpha*pow((1+g_node->depth+1),-data.beta)) + // Prior of left node being terminal
+                log(1-data.alpha*pow((1+g_node->depth+1),-data.beta)) - // Prior of the right noide being terminal
+                log(1-data.alpha*pow((1+g_node->depth),-data.beta)); // Old current node being terminal
+
+        // Getting the transition probability
+        double log_transition_prob = log((0.3)/(nog_nodes.size()+1)) - log(0.3/t_nodes.size()); // 0.3 and 0.3 are the prob of Prune and Grow, respectively
+
+        // Calculating the loglikelihood for the new branches
+        double new_tree_log_like =  - g_node->log_likelihood + g_node->left->log_likelihood + g_node->right->log_likelihood ;
+
+        // Calculating the acceptance ratio
+        double acceptance = exp(new_tree_log_like  + log_transition_prob + tree_prior);
+
+
+
+        // Keeping the new tree or not
+        if(arma::randu(arma::distr_param(0.0,1.0)) < acceptance){
+                // Do nothing just keep the new tree
+                // cout << " ACCEPTED" << endl;
+                data.move_acceptance(1)++;
         } else {
                 // Returning to the old values
                 g_node->var_split = old_var_split;
@@ -602,7 +793,7 @@ void prune(Node* tree, modelParam&data, arma::vec &curr_res,  int t){
 
         if(rand_unif()<acceptance){
                 p_node->deletingLeaves();
-                data.prune_accept++;
+                data.move_acceptance(2);
         } else {
                 // p_node->left->gpNodeLogLike(data, curr_res);
                 // p_node->right->gpNodeLogLike(data, curr_res);
@@ -788,7 +979,7 @@ void change(Node* tree, modelParam &data, arma::vec &curr_res, int t){
 
         if(rand_unif()<acceptance){
                 // Keep all the trees
-                data.change_accept++;
+                data.move_acceptance(3)++;
         } else {
 
                 // Returning to the previous values
@@ -823,6 +1014,246 @@ void change(Node* tree, modelParam &data, arma::vec &curr_res, int t){
         return;
 }
 
+
+// // Creating the change verb
+void change_rotation(Node* tree, modelParam &data, arma::vec &curr_res, int t){
+
+
+        // Getting the number of terminal nodes
+        std::vector<Node*> t_nodes = leaves(tree) ;
+        std::vector<Node*> nog_nodes = nogs(tree);
+
+        // Selecting one node to be sampled
+        Node* c_node = sample_node(nog_nodes);
+
+        // Calculate current tree log likelihood
+        // double tree_log_like = 0; // Need to uncomment this too
+
+        if(c_node->isRoot){
+                // cout << " THAT NEVER HAPPENS" << endl;
+                c_node-> n_leaf = data.x_train.n_rows;
+                c_node-> n_leaf_test = data.x_test.n_rows;
+        }
+
+        // Calculating the whole likelihood for the tree ( Do I really need to do this here? I do not think so)
+        // (Yes, I do if I'm going to work with the loglikelihood over the trees to compute \phi_{i,j})
+        // ----------------------------------------------
+        // -- Gonna generalize the code to avoid this ---
+        // ----------------------------------------------
+        // double tree_log_like = 0.0;
+        // // cout << " Change error on terminal nodes" << endl;
+        // // Calculating the whole likelihood fo the tree
+        for(int i = 0; i < t_nodes.size(); i++){
+                // cout << "Loglike error " << ed
+                t_nodes[i]->nodeLogLike(data, curr_res);
+                // tree_log_like = tree_log_like + t_nodes[i]->log_likelihood;
+        }
+
+
+        // Updating the loglike of the nodes that gonna be changed only
+        // c_node->left->gpNodeLogLike(data,curr_res,t);
+        // c_node->right->gpNodeLogLike(data,curr_res,t);
+
+        // cout << " Other kind of error" << endl;
+        // If the current node has size zero there is no point of change its rule
+        if(c_node->n_leaf==0) {
+                return;
+        }
+
+        // Storing all the old loglikelihood from left
+        double old_left_log_like = c_node->left->log_likelihood;
+        double old_left_r_sq_sum = c_node->left->r_sq_sum;
+        double old_left_r_sum = c_node->left->r_sum;
+
+        arma::vec old_left_train_index = c_node->left->train_index;
+        c_node->left->train_index.fill(-1); // Returning to the original
+        int old_left_n_leaf = c_node->left->n_leaf;
+
+
+        // Storing all of the old loglikelihood from right;
+        double old_right_log_like = c_node->right->log_likelihood;
+        double old_right_r_sq_sum = c_node->right->r_sq_sum;
+        double old_right_r_sum = c_node->right->r_sum;
+
+        arma::vec old_right_train_index = c_node->right->train_index;
+        c_node->right->train_index.fill(-1);
+        int old_right_n_leaf = c_node->right->n_leaf;
+
+
+
+        // Storing test observations
+        arma::vec old_left_test_index = c_node->left->test_index;
+        arma::vec old_right_test_index = c_node->right->test_index;
+        c_node->left->test_index.fill(-1);
+        c_node->right->test_index.fill(-1);
+
+        int old_left_n_leaf_test = c_node->left->n_leaf_test;
+        int old_right_n_leaf_test = c_node->right->n_leaf_test;
+
+
+        // Storing the old ones
+        int old_var_split = c_node->var_split;
+        int old_var_split_rule = c_node->var_split_rule;
+        int old_lower = c_node->lower;
+        int old_upper = c_node->upper;
+
+
+        // Creating the rotation dummy aux
+        arma::mat rotated_coord(data.x_train.n_rows,2);
+        arma::mat rotated_coord_test(data.x_test.n_rows,2);
+
+        // Sample var
+        arma::vec candidates = arma::regspace(0,(data.x_train.n_cols-1));
+        arma::vec sample = arma::shuffle(candidates);
+        sample = sample.subvec(0,1);
+
+        // Rotating coordinations
+        rotated_coord.col(0) = data.x_train.col(sample(0));
+        rotated_coord.col(1) = data.x_train.col(sample(1));
+
+        rotated_coord_test.col(0) = data.x_test.col(sample(0));
+        rotated_coord_test.col(1) = data.x_test.col(sample(1));
+
+        arma::mat rotate_operator_ = rotate_operator();
+        rotated_coord  = rotated_coord*rotate_operator_;
+        rotated_coord_test = rotated_coord_test*rotate_operator_;
+
+        // Selecting the var
+        int selected_rot_var =  arma::randi(arma::distr_param(0,1));
+        double rotated_var_split_rule = arma::randu(arma::distr_param(min(rotated_coord.col(selected_rot_var)),max(rotated_coord.col(selected_rot_var))));
+
+        // Create an aux for the left and right index
+        int train_left_counter = 0;
+        int train_right_counter = 0;
+
+        int test_left_counter = 0;
+        int test_right_counter = 0;
+
+
+        // Updating the left and the right nodes
+        for(int i = 0;i<data.x_train.n_rows;i++){
+                // cout << " Train indexeses " << c_node -> train_index[i] << endl ;
+                if(c_node -> train_index[i] == -1){
+                        c_node->left->n_leaf = train_left_counter;
+                        c_node->right->n_leaf = train_right_counter;
+                        break;
+                }
+                // cout << " Current train index " << c_node->train_index[i] << endl;
+
+                if(rotated_coord(c_node->train_index[i],selected_rot_var)<rotated_var_split_rule){
+                        c_node->left->train_index[train_left_counter] = c_node->train_index[i];
+                        train_left_counter++;
+                } else {
+                        c_node->right->train_index[train_right_counter] = c_node->train_index[i];
+                        train_right_counter++;
+                }
+        }
+
+
+
+        // Updating the left and the right nodes
+        for(int i = 0;i<data.x_test.n_rows;i++){
+
+                if(c_node -> test_index[i] == -1){
+                        c_node->left->n_leaf_test = test_left_counter;
+                        c_node->right->n_leaf_test = test_right_counter;
+                        break;
+                }
+
+                if(rotated_coord_test(c_node->test_index[i],selected_rot_var)<rotated_var_split_rule){
+                        c_node->left->test_index[test_left_counter] = c_node->test_index[i];
+                        test_left_counter++;
+                } else {
+                        c_node->right->test_index[test_right_counter] = c_node->test_index[i];
+                        test_right_counter++;
+                }
+        }
+
+        // If is a root node
+        if(c_node->isRoot){
+                c_node->left->n_leaf = train_left_counter;
+                c_node->right->n_leaf = train_right_counter;
+                c_node->left->n_leaf_test = test_left_counter;
+                c_node->right->n_leaf_test = test_right_counter;
+        }
+
+
+        if((c_node->left->n_leaf<data.node_min_size) || (c_node->right->n_leaf)<data.node_min_size){
+
+                // Returning to the previous values
+                c_node->var_split = old_var_split;
+                c_node->var_split_rule = old_var_split_rule;
+                c_node->lower = old_lower;
+                c_node->upper = old_upper;
+
+                // Returning to the old ones
+                c_node->left->r_sq_sum = old_left_r_sq_sum;
+                c_node->left->r_sum = old_left_r_sum;
+
+                c_node->left->n_leaf = old_left_n_leaf;
+                c_node->left->n_leaf_test = old_left_n_leaf_test;
+                c_node->left->log_likelihood = old_left_log_like;
+                c_node->left->train_index = old_left_train_index;
+                c_node->left->test_index = old_left_test_index;
+
+                // Returning to the old ones
+                c_node->right->r_sq_sum = old_right_r_sq_sum;
+                c_node->right->r_sum = old_right_r_sum;
+
+                c_node->right->n_leaf = old_right_n_leaf;
+                c_node->right->n_leaf_test = old_right_n_leaf_test;
+                c_node->right->log_likelihood = old_right_log_like;
+                c_node->right->train_index = old_right_train_index;
+                c_node->right->test_index = old_right_test_index;
+
+                return;
+        }
+
+        // Updating the new left and right loglikelihoods
+        c_node->left->nodeLogLike(data,curr_res);
+        c_node->right->nodeLogLike(data,curr_res);
+
+        // Calculating the acceptance
+        double new_tree_log_like =  - old_left_log_like - old_right_log_like + c_node->left->log_likelihood + c_node->right->log_likelihood;
+
+        double acceptance = exp(new_tree_log_like);
+
+        if(rand_unif()<acceptance){
+                // Keep all the trees
+                data.move_acceptance(4)++;
+        } else {
+
+                // Returning to the previous values
+                c_node->var_split = old_var_split;
+                c_node->var_split_rule = old_var_split_rule;
+                c_node->lower = old_lower;
+                c_node->upper = old_upper;
+
+                // Returning to the old ones
+                c_node->left->r_sq_sum = old_left_r_sq_sum;
+                c_node->left->r_sum = old_left_r_sum;
+
+
+                c_node->left->n_leaf = old_left_n_leaf;
+                c_node->left->n_leaf_test = old_left_n_leaf_test;
+                c_node->left->log_likelihood = old_left_log_like;
+                c_node->left->train_index = old_left_train_index;
+                c_node->left->test_index = old_left_test_index;
+
+                // Returning to the old ones
+                c_node->right->r_sq_sum = old_right_r_sq_sum;
+                c_node->right->r_sum = old_right_r_sum;
+
+                c_node->right->n_leaf = old_right_n_leaf;
+                c_node->right->n_leaf_test = old_right_n_leaf_test;
+                c_node->right->log_likelihood = old_right_log_like;
+                c_node->right->train_index = old_right_train_index;
+                c_node->right->test_index = old_right_test_index;
+
+        }
+
+        return;
+}
 
 
 
@@ -997,6 +1428,7 @@ Rcpp::List cppbart(arma::mat x_train,
 
         arma::cube all_tree_post(y_train.size(),n_tree,n_post,arma::fill::zeros);
         arma::vec tau_post = arma::zeros<arma::vec>(n_post);
+        arma::vec all_tau_post = arma::zeros<arma::vec>(n_mcmc);
 
 
         // Defining other variables
@@ -1105,7 +1537,7 @@ Rcpp::List cppbart(arma::mat x_train,
                 // std::cout << "Error Tau: " << data.tau<< endl;
                 updateTau(prediction_train_sum, data);
                 // std::cout << "New Tau: " << data.tau<< endl;
-
+                all_tau_post(i) = data.tau;
                 // std::cout << " All good " << endl;
                 if(i >= n_burn){
                         // Storing the predictions
@@ -1138,13 +1570,14 @@ Rcpp::List cppbart(arma::mat x_train,
 
         std::cout << std::endl;
 
-        return Rcpp::List::create(y_train_hat_post,
-                                  y_test_hat_post,
-                                  tau_post,
-                                  all_tree_post,
-                                  data.grow_accept,
-                                  data.prune_accept,
-                                  data.change_accept);
+        return Rcpp::List::create(y_train_hat_post, //[1]
+                                  y_test_hat_post, //[2]
+                                  tau_post, //[3]
+                                  all_tree_post, // [4]
+                                  data.move_proposal, // [5]
+                                  data.move_acceptance,// [6]
+                                  all_tau_post // [7]
+                                );
 }
 
 

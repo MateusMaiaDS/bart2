@@ -27,9 +27,8 @@ struct modelParam {
         int n_burn;
 
         // Create an indicator of accepted grown trees
-        int grow_accept;
-        int prune_accept;
-        int change_accept;
+        arma::vec move_proposal;
+        arma::vec move_acceptance;
 
         // Create a boolean to only use stumps
         bool stump;
