@@ -1501,7 +1501,7 @@ Rcpp::List cppbart(arma::mat x_train,
                         }
 
 
-                        if(no_rotation_bool) {
+                        if(!no_rotation_bool) {
                                 // Selecting the verb
                                 if(verb < 0.15){
                                         data.move_proposal(0)++;
@@ -1527,12 +1527,17 @@ Rcpp::List cppbart(arma::mat x_train,
 
                                 // Selecting the verb
                                 if(verb < 0.3){
+                                        data.move_proposal(0)++;
                                         // cout << " Grow error" << endl;
                                         grow(all_forest.trees[t],data,partial_residuals);
                                 } else if(verb>=0.3 & verb <0.6) {
+                                        data.move_proposal(2)++;
+
                                         // cout << " Prune error" << endl;
                                         prune(all_forest.trees[t], data, partial_residuals);
                                 } else {
+                                        data.move_proposal(3)++;
+
                                         // cout << " Change error" << endl;
                                         change(all_forest.trees[t], data, partial_residuals);
                                         // std::cout << "Error after change" << endl;
