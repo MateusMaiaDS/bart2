@@ -418,7 +418,7 @@ Node* sample_node(std::vector<Node*> leaves_){
 }
 
 // Grow a tree for a given rule
-void grow(Node* tree, modelParam &data, arma::vec &curr_res, int t){
+void grow(Node* tree, modelParam &data, arma::vec &curr_res){
 
         // Getting the number of terminal nodes
         std::vector<Node*> t_nodes = leaves(tree) ;
@@ -741,7 +741,7 @@ void grow_rotation(Node* tree, modelParam &data, arma::vec &curr_res){
 
 
 // Pruning a tree
-void prune(Node* tree, modelParam&data, arma::vec &curr_res,  int t){
+void prune(Node* tree, modelParam&data, arma::vec &curr_res){
 
 
         // Getting the number of terminal nodes
@@ -793,7 +793,7 @@ void prune(Node* tree, modelParam&data, arma::vec &curr_res,  int t){
 
         if(rand_unif()<acceptance){
                 p_node->deletingLeaves();
-                data.move_acceptance(2);
+                data.move_acceptance(2)++;
         } else {
                 // p_node->left->gpNodeLogLike(data, curr_res);
                 // p_node->right->gpNodeLogLike(data, curr_res);
@@ -804,7 +804,7 @@ void prune(Node* tree, modelParam&data, arma::vec &curr_res,  int t){
 
 
 // // Creating the change verb
-void change(Node* tree, modelParam &data, arma::vec &curr_res, int t){
+void change(Node* tree, modelParam &data, arma::vec &curr_res){
 
 
         // Getting the number of terminal nodes
@@ -1016,7 +1016,7 @@ void change(Node* tree, modelParam &data, arma::vec &curr_res, int t){
 
 
 // // Creating the change verb
-void change_rotation(Node* tree, modelParam &data, arma::vec &curr_res, int t){
+void change_rotation(Node* tree, modelParam &data, arma::vec &curr_res){
 
 
         // Getting the number of terminal nodes
@@ -1396,7 +1396,8 @@ Rcpp::List cppbart(arma::mat x_train,
           double tau_mu,
           double alpha, double beta,
           double a_tau, double d_tau,
-          bool stump){
+          bool stump,
+          bool no_rotation_bool){
 
         // Posterior counter
         int curr = 0;
@@ -1496,22 +1497,47 @@ Rcpp::List cppbart(arma::mat x_train,
                         // Iterating over all trees
                         verb = rand_unif();
                         if(all_forest.trees[t]->isLeaf & all_forest.trees[t]->isRoot){
-                                verb = 0.27;
+                                verb = arma::randu(arma::distr_param(0.0,0.3));
                         }
 
-                        // Selecting the verb
-                        if(verb < 0.3){
-                                // cout << " Grow error" << endl;
-                                grow(all_forest.trees[t],data,partial_residuals,t);
-                        } else if(verb>=0.3 & verb <0.6) {
-                                // cout << " Prune error" << endl;
-                                prune(all_forest.trees[t], data, partial_residuals,t);
+
+                        if(no_rotation_bool) {
+                                // Selecting the verb
+                                if(verb < 0.15){
+                                        data.move_proposal(0)++;
+                                        // cout << " Grow error" << endl;
+                                        grow(all_forest.trees[t],data,partial_residuals);
+                                } else if(verb>=0.15 & verb <0.3) {
+                                        data.move_proposal(1)++;
+                                        // cout << " Prune error" << endl;
+                                        grow_rotation(all_forest.trees[t], data, partial_residuals);
+                                } else if(verb>=0.33 & verb <0.6) {
+                                        data.move_proposal(2)++;
+                                        // cout << " Change error" << endl;
+                                        prune(all_forest.trees[t], data, partial_residuals);
+                                        // std::cout << "Error after change" << endl;
+                                } else if(verb>=0.6 & verb <= 0.8){
+                                       data.move_proposal(3)++;
+                                       change(all_forest.trees[t], data, partial_residuals);
+                                } else {
+                                        data.move_proposal(4)++;
+                                        change_rotation(all_forest.trees[t], data, partial_residuals);
+                                }
                         } else {
-                                // cout << " Change error" << endl;
-                                change(all_forest.trees[t], data, partial_residuals,t);
-                                // std::cout << "Error after change" << endl;
-                        }
 
+                                // Selecting the verb
+                                if(verb < 0.3){
+                                        // cout << " Grow error" << endl;
+                                        grow(all_forest.trees[t],data,partial_residuals);
+                                } else if(verb>=0.3 & verb <0.6) {
+                                        // cout << " Prune error" << endl;
+                                        prune(all_forest.trees[t], data, partial_residuals);
+                                } else {
+                                        // cout << " Change error" << endl;
+                                        change(all_forest.trees[t], data, partial_residuals);
+                                        // std::cout << "Error after change" << endl;
+                                }
+                        }
                         updateMu(all_forest.trees[t],data);
 
                         // Getting predictions
@@ -1538,6 +1564,7 @@ Rcpp::List cppbart(arma::mat x_train,
                 updateTau(prediction_train_sum, data);
                 // std::cout << "New Tau: " << data.tau<< endl;
                 all_tau_post(i) = data.tau;
+
                 // std::cout << " All good " << endl;
                 if(i >= n_burn){
                         // Storing the predictions

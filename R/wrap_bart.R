@@ -26,7 +26,8 @@ bart2 <- function(x_train,
                   kappa = 2,
                   tau = 100,
                   scale_bool = TRUE,
-                  stump = FALSE
+                  stump = FALSE,
+                  no_rotation_bool = FALSE
                   ) {
 
 
@@ -158,7 +159,7 @@ bart2 <- function(x_train,
      return(list(y_hat = y_train_post,
                  y_hat_test = y_test_post,
                  tau_post = tau_post,
-                 all_tau_post = bart_obj[[7]],
+                 all_tau_post = all_tau_post,
                  all_tree_post = all_tree_post,
                  prior = list(n_tree = n_tree,
                               alpha = alpha,
